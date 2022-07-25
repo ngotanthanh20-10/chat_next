@@ -99,6 +99,36 @@ const Sidebar = () => {
         <StyledSearchInput placeholder="Search..." />
       </StyledSearch>
       <StyledSidebarButton>start a new conversation</StyledSidebarButton>
+
+      <Dialog
+				open={isOpenNewConversationDialog}
+				onClose={closeNewConversationDialog}
+			>
+				<DialogTitle>New Conversation</DialogTitle>
+				<DialogContent>
+					<DialogContentText>
+						Please enter a Google email address for the user you wish to chat
+						with
+					</DialogContentText>
+					<TextField
+						autoFocus
+						label='Email Address'
+						type='email'
+						fullWidth
+						variant='standard'
+						value={recipientEmail}
+						onChange={event => {
+							setRecipientEmail(event.target.value)
+						}}
+					/>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={closeNewConversationDialog}>Cancel</Button>
+					<Button disabled={!recipientEmail} onClick={createConversation}>
+						Create
+					</Button>
+				</DialogActions>
+			</Dialog>
     </StyledContainer>
   );
 };
