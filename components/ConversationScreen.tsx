@@ -8,7 +8,12 @@ import SendIcon from "@mui/icons-material/Send";
 import MicIcon from "@mui/icons-material/Mic";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useCollection } from "react-firebase-hooks/firestore";
-import { useState } from "react";
+import {
+  KeyboardEventHandler,
+  MouseEventHandler,
+  useRef,
+  useState,
+} from "react";
 
 import { useRecipient } from "../hooks/useRecipient";
 import { Conversation, IMessage } from "../types";
@@ -18,9 +23,15 @@ import {
   transformMessage,
 } from "../utils/getMessagesInConversation";
 import RecipientAvatar from "./RecipientAvatar";
-import { auth } from "../config/firebase";
-import { json } from "stream/consumers";
+import { auth, db } from "../config/firebase";
 import Message from "./Message";
+import {
+  setDoc,
+  doc,
+  serverTimestamp,
+  addDoc,
+  collection,
+} from "firebase/firestore";
 
 const StyledRecipientHeader = styled.div`
   position: sticky;
@@ -93,27 +104,85 @@ const ConversationScreen = ({
   messages: IMessage[];
 }) => {
   const [newMessage, setNewMessage] = useState("");
+
   const [loggedInUser, _loading, _error] = useAuthState(auth);
+
   const conversationUsers = conversation.users;
+
   const { recipientEmail, recipient } = useRecipient(conversationUsers);
+
   const router = useRouter();
+
   const conversationId = router.query.id; // http://localhost:3000/conversations/id
+
   const queryGetMessages = generateQueryGetMessages(conversationId as string);
+
   const [messagesSnapshot, messagesLoading, __error] =
     useCollection(queryGetMessages);
+
   const showMessages = () => {
     if (messagesLoading) {
       return messages.map((message) => (
         <Message key={message.id} message={message} />
       ));
     }
+
     if (messagesSnapshot) {
       return messagesSnapshot.docs.map((message) => (
         <Message key={message.id} message={transformMessage(message)} />
       ));
     }
+
     return null;
   };
+
+  const addMessage = async () => {
+    // update last seen in 'users' collection
+    await setDoc(
+      doc(db, "users", loggedInUser?.email as string),
+      {
+        lastSeen: serverTimestamp(),
+      },
+      { merge: true }
+    ); // just update what is changed
+
+    // add new message to 'messages' collection
+    await addDoc(collection(db, "messages"), {
+      conversation_id: conversationId,
+      sent_at: serverTimestamp(),
+      text: newMessage,
+      user: loggedInUser?.email,
+    });
+
+    // reset input field
+    setNewMessage("");
+
+    // scroll to bottom
+    scrollToBottom();
+  };
+
+  const sendMessageOnEnter: KeyboardEventHandler<HTMLInputElement> = (
+    event
+  ) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (!newMessage) return;
+      addMessage();
+    }
+  };
+
+  const sendMessageOnClick: MouseEventHandler<HTMLButtonElement> = (event) => {
+    event.preventDefault();
+    if (!newMessage) return;
+    addMessage();
+  };
+
+  const endOfMessagesRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <>
       <StyledRecipientHeader>
@@ -140,19 +209,19 @@ const ConversationScreen = ({
         </StyledHeaderIcons>
       </StyledRecipientHeader>
 
-      <StyledMessageContainer>{showMessages()}</StyledMessageContainer>
+      <StyledMessageContainer>
+        {showMessages()}
+        <EndOfMessagesForAutoScroll ref={endOfMessagesRef} />
+      </StyledMessageContainer>
 
       <StyledInputContainer>
         <InsertEmoticonIcon />
         <StyledInput
-        // value={newMessage}
-        // onChange={(event) => setNewMessage(event.target.value)}
-        // onKeyDown={sendMessageOnEnter}
+          value={newMessage}
+          onChange={(event) => setNewMessage(event.target.value)}
+          onKeyDown={sendMessageOnEnter}
         />
-        <IconButton
-        // onClick={sendMessageOnClick}
-        // disabled={!newMessage}
-        >
+        <IconButton onClick={sendMessageOnClick} disabled={!newMessage}>
           <SendIcon />
         </IconButton>
         <IconButton>

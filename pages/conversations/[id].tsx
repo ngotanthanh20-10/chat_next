@@ -47,6 +47,7 @@ const Conversation = ({ conversation, messages }: Props) => {
           Conversation with{" "}
           {getRecipientEmail(conversation.users, loggedInUser)}
         </title>
+        <link rel="icon" href="/icon.webp" />
       </Head>
 
       <Sidebar />
